@@ -1,98 +1,110 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 
-function UserList() {
+function UserList({ refresh }) {
   const [users, setUsers] = useState([]);
-  const [nombre, setNombre] = useState("");
-  const [email, setEmail] = useState("");
-  const [editId, setEditId] = useState(null);
+  const [editingUser, setEditingUser] = useState(null);
+  const [form, setForm] = useState({ nombre: "", email: "", telefono: "" });
 
-  // Cargar usuarios al iniciar
   useEffect(() => {
-    obtenerUsuarios();
-  }, []);
+    axios.get("http://localhost:5001/api/usuarios")
+      .then(res => setUsers(res.data))
+      .catch(err => console.error("Error al obtener usuarios:", err));
+  }, [refresh]);
 
-  const obtenerUsuarios = async () => {
-    const res = await axios.get("http://localhost:5001/api/usuarios");
-    setUsers(res.data);
-  };
-
-  //Agregar o actualizar usuario
-  const guardarUsuario = async () => {
-    if (!nombre || !email) return alert("Completa todos los campos");
-
-    if (editId) {
-      // Editar usuario
-      await axios.put(`http://localhost:5001/api/usuarios/${editId}`, { nombre, email });
-      setEditId(null);
-    } else {
-      // Crear usuario nuevo
-      await axios.post("http://localhost:5001/api/usuarios", { nombre, email });
-    }
-
-    setNombre("");
-    setEmail("");
-    obtenerUsuarios();
-  };
-
-  //Eliminar usuario
-  const eliminarUsuario = async (id) => {
-    if (window.confirm("¿Seguro que quieres eliminar este usuario?")) {
-      await axios.delete(`http://localhost:5001/api/usuarios/${id}`);
-      obtenerUsuarios();
+  // 🔹 Eliminar usuario
+  const handleDelete = (id) => {
+    if (window.confirm("¿Seguro que deseas eliminar este usuario?")) {
+      axios.delete("http://localhost:5001/api/usuarios/delete/${id}")
+        .then(() => {
+          setUsers(users.filter(u => u.id !== id));
+        })
+        .catch(err => console.error("Error al eliminar usuario:", err));
     }
   };
 
-  //Editar usuario
-  const editarUsuario = (u) => {
-    setEditId(u.id);
-    setNombre(u.nombre);
-    setEmail(u.email);
+  // 🔹 Activar modo edición
+  const handleEdit = (user) => {
+    setEditingUser(user.id);
+    setForm({ nombre: user.nombre, email: user.email, telefono: user.telefono });
+  };
+
+  // 🔹 Guardar cambios
+  const handleUpdate = (e) => {
+    e.preventDefault();
+    axios.put("http://localhost:5001/api/usuarios/update/${editingUser}, form")
+      .then(() => {
+        setEditingUser(null);
+        setForm({ nombre: "", email: "", telefono: "" });
+        axios.get("http://localhost:5001/api/usuarios")
+          .then(res => setUsers(res.data));
+      })
+      .catch(err => console.error("Error al actualizar usuario:", err));
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>Gestión de Usuarios</h2>
+    <div style={{ marginTop: "20px" }}>
+      <h3>Lista de Usuarios</h3>
 
-      <div style={{ marginBottom: "10px" }}>
-        <input
-          placeholder="Nombre"
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-        />
-        <input
-          placeholder="Correo"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <button onClick={guardarUsuario}>
-          {editId ? "Actualizar" : "Agregar"}
-        </button>
-      </div>
-
-      <table border="1" cellPadding="10">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Nombre</th>
-            <th>Correo</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((u) => (
-            <tr key={u.id}>
-              <td>{u.id}</td>
-              <td>{u.nombre}</td>
-              <td>{u.email}</td>
-              <td>
-                <button onClick={() => editarUsuario(u)}>Editar</button>
-                <button onClick={() => eliminarUsuario(u.id)}>Eliminar</button>
-              </td>
+      {users.length === 0 ? (
+        <p>No hay usuarios registrados.</p>
+      ) : (
+        <table border="1" cellPadding="10" style={{ width: "100%", textAlign: "left" }}>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nombre</th>
+              <th>Email</th>
+              <th>Teléfono</th>
+              <th>Acciones</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {users.map(u => (
+              <tr key={u.id}>
+                <td>{u.id}</td>
+                <td>{u.nombre}</td>
+                <td>{u.email}</td>
+                <td>{u.telefono}</td>
+                <td>
+                  <button onClick={() => handleEdit(u)}>Editar</button>
+                  <button onClick={() => handleDelete(u.id)}>Eliminar</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {editingUser && (
+        <div style={{ marginTop: "20px", padding: "10px", border: "1px solid #ccc" }}>
+          <h3>Editar Usuario</h3>
+          <form onSubmit={handleUpdate}>
+            <input
+              type="text"
+              placeholder="Nombre"
+              value={form.nombre}
+              onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+              required
+            />
+            <input
+              type="email"
+              placeholder="Email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              required
+            />
+            <input
+              type="text"
+              placeholder="Teléfono"
+              value={form.telefono}
+              onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+            />
+            <button type="submit">Guardar cambios</button>
+            <button type="button" onClick={() => setEditingUser(null)}>Cancelar</button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
